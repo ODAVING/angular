@@ -89,14 +89,15 @@ export function compilePipeFromRender2(
     pure: pipe.pure,
   };
   const res = compilePipeFromMetadata(metadata);
-  const factoryRes = compileFactoryFromMetadata({...metadata, isPipe: true});
+  const factoryRes =
+      compileFactoryFromMetadata({...metadata, injectFn: R3.directiveInject, isPipe: true});
   const definitionField = outputCtx.constantPool.propertyNameOf(DefinitionKind.Pipe);
   const ngFactoryDefStatement = new o.ClassStmt(
       /* name */ name,
       /* parent */ null,
       /* fields */
       [new o.ClassField(
-          /* name */ 'ngFactoryDef',
+          /* name */ 'ɵfac',
           /* type */ o.INFERRED_TYPE,
           /* modifiers */[o.StmtModifier.Static],
           /* initializer */ factoryRes.factory)],

@@ -29,7 +29,7 @@ var_4_win: &cache_key_win_fallback v5-angular-win-node-12.0-
 
 # Cache key for the Material unit tests job. **Note** when updating the SHA in the cache keys,
 # also update the SHA for the "MATERIAL_REPO_COMMIT" environment variable.
-var_5: &material_unit_tests_cache_key v4-angular-material-2817c9e2faa4140342336987a692d5dd30bf24c2
+var_5: &material_unit_tests_cache_key v4-angular-material-818a8c7d6bb3f25d0637e5d6462cf9a84403b78f
 var_6: &material_unit_tests_cache_key_fallback v4-angular-material-
 
 # Workspace initially persisted by the `setup` job, and then enhanced by `build-npm-packages` and
@@ -120,19 +120,24 @@ commands:
     description: Initializing environment (setting up variables, overwriting Yarn)
     steps:
       - run: ./.circleci/env.sh
-      # Overwrite the yarn installed in the docker container with our own version.
-      - run: |
-          ourYarn=$(realpath ./third_party/github.com/yarnpkg/yarn/releases/download/v1.17.3/bin/yarn.js)
-          sudo chmod a+x $ourYarn
-          sudo ln -fs $ourYarn /usr/local/bin/yarn
+      - run:
+          # Overwrite the yarn installed in the docker container with our own version.
+          name: Overwrite yarn with our own version
+          command: |
+            ourYarn=$(realpath ./third_party/github.com/yarnpkg/yarn/releases/download/v1.17.3/bin/yarn.js)
+            sudo chmod a+x $ourYarn
+            sudo ln -fs $ourYarn /usr/local/bin/yarn
       - run: echo "Yarn version $(yarn --version)"
-      # Configure git as the CircleCI `checkout` command does.
-      # This is needed because we only checkout on the setup job.
-      # Add GitHub to known hosts
-      - run: mkdir -p ~/.ssh
-      - run: echo 'github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==' >> ~/.ssh/known_hosts
-      - run: git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
-      - run: git config --global gc.auto 0 || true
+      - run:
+          # Configure git as the CircleCI `checkout` command does.
+          # This is needed because we only checkout on the setup job.
+          # Add GitHub to known hosts
+          name: Configure git
+          command: |
+            mkdir -p ~/.ssh
+            echo 'github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==' >> ~/.ssh/known_hosts
+            git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
+            git config --global gc.auto 0 || true
 
   # Normally this would be an individual job instead of a command.
   # But startup and setup time for each invidual windows job are high enough to discourage
@@ -347,6 +352,10 @@ jobs:
     steps:
       - custom_attach_workspace
       - init_environment
+        # Compile dependencies to ivy
+        # Running `ngcc` here (instead of implicitly via `ng build`) allows us to take advantage of
+        # the parallel, async mode speed-up (~20-25s on CI).
+      - run: yarn --cwd aio ivy-ngcc --properties es2015
         # Build aio
       - run: yarn --cwd aio build --progress=false
         # Lint the code
@@ -376,7 +385,7 @@ jobs:
 
   test_aio_local:
     parameters:
-      ivy:
+      viewengine:
         type: boolean
         default: false
     # Needed because the AIO tests and the PWA score test depend on Chrome being available.
@@ -385,7 +394,7 @@ jobs:
       - custom_attach_workspace
       - init_environment
         # Build aio (with local Angular packages)
-      - run: yarn --cwd aio build-local<<# parameters.ivy >>-with-ivy<</ parameters.ivy >>-ci
+      - run: yarn --cwd aio build-local<<# parameters.viewengine >>-with-viewengine<</ parameters.viewengine >>-ci
         # Run unit tests
       - run: yarn --cwd aio test --progress=false --watch=false
         # Run e2e tests
@@ -393,7 +402,7 @@ jobs:
         # Run PWA-score tests
       - run: yarn --cwd aio test-pwa-score-localhost $CI_AIO_MIN_PWA_SCORE
         # Check the bundle sizes.
-      - run: yarn --cwd aio payload-size aio-local<<# parameters.ivy >>-ivy<</ parameters.ivy >>
+      - run: yarn --cwd aio payload-size aio-local<<# parameters.viewengine >>-viewengine<</ parameters.viewengine >>
 
   test_aio_tools:
     executor: default-executor
@@ -644,7 +653,7 @@ jobs:
       # the ESM5/ES2015 output. See: https://github.com/angular/angular/issues/27966
       # - run: yarn gulp source-map-test
 
-  # Job to run unit tests from angular/material2. Needs a browser since all
+  # Job to run unit tests from angular/components. Needs a browser since all
   # component unit tests assume they're running in the browser environment.
   material-unit-tests:
     executor:
@@ -685,7 +694,9 @@ jobs:
           command: ./scripts/ci/run_angular_material_unit_tests.sh
 
   test_zonejs:
-    executor: default-executor
+    executor:
+      name: default-executor
+      resource_class: xlarge
     steps:
       - custom_attach_workspace
       - init_environment
@@ -776,8 +787,8 @@ workflows:
           requires:
             - build-npm-packages
       - test_aio_local:
-          name: test_aio_local_ivy
-          ivy: true
+          name: test_aio_local_viewengine
+          viewengine: true
           requires:
             - build-npm-packages
       - test_aio_tools:
@@ -816,7 +827,7 @@ workflows:
             - integration_test
             # Only publish if `aio`/`docs` tests using the locally built Angular packages pass
             - test_aio_local
-            - test_aio_local_ivy
+            - test_aio_local_viewengine
             - test_docs_examples
             - test_docs_examples_ivy
             # Get the artifacts to publish from the build-packages-dist job
@@ -825,9 +836,10 @@ workflows:
             - build-ivy-npm-packages
             - legacy-unit-tests-saucelabs
             - legacy-misc-tests
-      - material-unit-tests:
-          requires:
-            - build-ivy-npm-packages
+      # FIXME: temporarily disabled until the components repo updates to typescript 3.6
+      #- material-unit-tests:
+      #    requires:
+      #      - build-ivy-npm-packages
       - test_zonejs:
           requires:
             - setup

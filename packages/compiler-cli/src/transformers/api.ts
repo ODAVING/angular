@@ -16,7 +16,7 @@ export const SOURCE = 'angular' as 'angular';
 export interface DiagnosticMessageChain {
   messageText: string;
   position?: Position;
-  next?: DiagnosticMessageChain;
+  next?: DiagnosticMessageChain[];
 }
 
 export interface Diagnostic {
@@ -160,6 +160,18 @@ export interface CompilerOptions extends ts.CompilerOptions {
   // Whether translation variable name should contain external message id
   // (used by Closure Compiler's output of `goog.getMsg` for transition period)
   i18nUseExternalIds?: boolean;
+
+  /**
+   * Render `$localize` message ids with the legacy format (xlf, xlf2 or xmb) specified in
+   * `i18nInFormat`.
+   *
+   * This is only active if we are building with `enableIvy: true` and a valid
+   * `i18nInFormat` has been provided. The default value for now is `true`.
+   *
+   * Use this option when use are using the `$localize` based localization messages but
+   * have not migrated the translation files to use the new `$localize` message id format.
+   */
+  enableI18nLegacyMessageIdFormat?: boolean;
 
   // Whether to remove blank text nodes from compiled templates. It is `false` by default starting
   // from Angular 6.

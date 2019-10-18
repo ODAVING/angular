@@ -59,7 +59,7 @@ export class DecorationAnalyzer {
     // TODO(alxhub): there's no reason why ngcc needs the "logical file system" logic here, as ngcc
     // projects only ever have one rootDir. Instead, ngcc should just switch its emitted import
     // based on whether a bestGuessOwningModule is present in the Reference.
-    new LogicalProjectStrategy(this.typeChecker, new LogicalFileSystem(this.rootDirs)),
+    new LogicalProjectStrategy(this.reflectionHost, new LogicalFileSystem(this.rootDirs)),
   ]);
   dtsModuleScopeResolver =
       new MetadataDtsModuleScopeResolver(this.dtsMetaReader, /* aliasGenerator */ null);
@@ -76,8 +76,8 @@ export class DecorationAnalyzer {
         this.reflectionHost, this.evaluator, this.fullRegistry, this.fullMetaReader,
         this.scopeRegistry, this.scopeRegistry, this.isCore, this.resourceManager, this.rootDirs,
         /* defaultPreserveWhitespaces */ false,
-        /* i18nUseExternalIds */ true, this.moduleResolver, this.cycleAnalyzer, this.refEmitter,
-        NOOP_DEFAULT_IMPORT_RECORDER),
+        /* i18nUseExternalIds */ true, /* i18nLegacyMessageIdFormat */ '', this.moduleResolver,
+        this.cycleAnalyzer, this.refEmitter, NOOP_DEFAULT_IMPORT_RECORDER),
     new DirectiveDecoratorHandler(
         this.reflectionHost, this.evaluator, this.fullRegistry, NOOP_DEFAULT_IMPORT_RECORDER,
         this.isCore),
@@ -171,8 +171,12 @@ export class DecorationAnalyzer {
     for (const {handler, analysis} of clazz.matches) {
       const result = handler.compile(clazz.declaration, analysis, constantPool);
       if (Array.isArray(result)) {
-        compilations.push(...result);
-      } else {
+        result.forEach(current => {
+          if (!compilations.some(compilation => compilation.name === current.name)) {
+            compilations.push(current);
+          }
+        });
+      } else if (!compilations.some(compilation => compilation.name === result.name)) {
         compilations.push(result);
       }
     }

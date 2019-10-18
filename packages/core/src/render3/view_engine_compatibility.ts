@@ -225,7 +225,7 @@ export function createContainerRef(
           ngModuleRef?: viewEngine_NgModuleRef<any>|undefined): viewEngine_ComponentRef<C> {
         const contextInjector = injector || this.parentInjector;
         if (!ngModuleRef && (componentFactory as any).ngModule == null && contextInjector) {
-          ngModuleRef = contextInjector.get(viewEngine_NgModuleRef, null);
+          ngModuleRef = contextInjector.get(viewEngine_NgModuleRef, null) || undefined;
         }
 
         const componentRef =

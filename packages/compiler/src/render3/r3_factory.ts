@@ -86,7 +86,8 @@ export interface R3FactoryDefMetadata {
   name: string;
   type: o.Expression;
   typeArgumentCount: number;
-  deps: R3DependencyMetadata[]|null;
+  deps: R3DependencyMetadata[]|'invalid'|null;
+  injectFn: o.ExternalReference;
   isPipe?: boolean;
 }
 
@@ -258,7 +259,7 @@ export function compileFactoryFunction(meta: R3FactoryMetadata, isPipe = false):
 }
 
 /**
- * Constructs the `ngFactoryDef` from directive/component/pipe metadata.
+ * Constructs the factory def (`ɵfac`) from directive/component/pipe metadata.
  */
 export function compileFactoryFromMetadata(meta: R3FactoryDefMetadata): R3FactoryFn {
   return compileFactoryFunction(
@@ -267,8 +268,7 @@ export function compileFactoryFromMetadata(meta: R3FactoryDefMetadata): R3Factor
         type: meta.type,
         deps: meta.deps,
         typeArgumentCount: meta.typeArgumentCount,
-        // TODO(crisbeto): this should be refactored once we start using it for injectables.
-        injectFn: R3.directiveInject,
+        injectFn: meta.injectFn,
       },
       meta.isPipe);
 }

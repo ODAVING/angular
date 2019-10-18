@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {ConstantPool, CssSelector, DEFAULT_INTERPOLATION_CONFIG, DomElementSchemaRegistry, Expression, ExternalExpr, InterpolationConfig, LexerRange, ParseError, ParseSourceFile, ParseTemplateOptions, R3ComponentMetadata, R3TargetBinder, SchemaMetadata, SelectorMatcher, Statement, TmplAstNode, WrappedNodeExpr, compileComponentFromMetadata, makeBindingParser, parseTemplate} from '@angular/compiler';
+import {ConstantPool, CssSelector, DEFAULT_INTERPOLATION_CONFIG, DomElementSchemaRegistry, Expression, ExternalExpr, Identifiers, InterpolationConfig, LexerRange, ParseError, ParseSourceFile, ParseTemplateOptions, R3ComponentMetadata, R3TargetBinder, SchemaMetadata, SelectorMatcher, Statement, TmplAstNode, WrappedNodeExpr, compileComponentFromMetadata, makeBindingParser, parseTemplate} from '@angular/compiler';
 import * as ts from 'typescript';
 
 import {CycleAnalyzer} from '../../cycles';
@@ -52,8 +52,9 @@ export class ComponentDecoratorHandler implements
       private scopeReader: ComponentScopeReader, private scopeRegistry: LocalModuleScopeRegistry,
       private isCore: boolean, private resourceLoader: ResourceLoader, private rootDirs: string[],
       private defaultPreserveWhitespaces: boolean, private i18nUseExternalIds: boolean,
-      private moduleResolver: ModuleResolver, private cycleAnalyzer: CycleAnalyzer,
-      private refEmitter: ReferenceEmitter, private defaultImportRecorder: DefaultImportRecorder,
+      private i18nLegacyMessageIdFormat: string, private moduleResolver: ModuleResolver,
+      private cycleAnalyzer: CycleAnalyzer, private refEmitter: ReferenceEmitter,
+      private defaultImportRecorder: DefaultImportRecorder,
       private resourceDependencies:
           ResourceDependencyRecorder = new NoopResourceDependencyRecorder()) {}
 
@@ -399,7 +400,7 @@ export class ComponentDecoratorHandler implements
       // First it needs to be determined if actually importing the directives/pipes used in the
       // template would create a cycle. Currently ngtsc refuses to generate cycles, so an option
       // known as "remote scoping" is used if a cycle would be created. In remote scoping, the
-      // module file sets the directives/pipes on the ngComponentDef of the component, without
+      // module file sets the directives/pipes on the ɵcmp of the component, without
       // requiring new imports (but also in a way that breaks tree shaking).
       //
       // Determining this is challenging, because the TemplateDefinitionBuilder is responsible for
@@ -455,7 +456,7 @@ export class ComponentDecoratorHandler implements
           this._recordSyntheticImport(pipe, context);
         }
 
-        // Check whether the directive/pipe arrays in ngComponentDef need to be wrapped in closures.
+        // Check whether the directive/pipe arrays in ɵcmp need to be wrapped in closures.
         // This is required if any directive/pipe reference is to a declaration in the same file but
         // declared after this component.
         const wrapDirectivesAndPipesInClosure =
@@ -486,13 +487,13 @@ export class ComponentDecoratorHandler implements
       CompileResult[] {
     const meta = analysis.meta;
     const res = compileComponentFromMetadata(meta, pool, makeBindingParser());
-    const factoryRes = compileNgFactoryDefField(meta);
+    const factoryRes = compileNgFactoryDefField({...meta, injectFn: Identifiers.directiveInject});
     if (analysis.metadataStmt !== null) {
       factoryRes.statements.push(analysis.metadataStmt);
     }
     return [
       factoryRes, {
-        name: 'ngComponentDef',
+        name: 'ɵcmp',
         initializer: res.expression,
         statements: [],
         type: res.type,
@@ -697,7 +698,8 @@ export class ComponentDecoratorHandler implements
       ...parseTemplate(templateStr, templateUrl, {
         preserveWhitespaces,
         interpolationConfig: interpolation,
-        range: templateRange, escapedString, ...options,
+        range: templateRange, escapedString,
+        i18nLegacyMessageIdFormat: this.i18nLegacyMessageIdFormat, ...options,
       }),
       template: templateStr, templateUrl,
       isInline: component.has('template'),

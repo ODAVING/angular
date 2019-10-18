@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {getCompilerFacade} from '../../compiler/compiler_facade';
+import {R3PipeMetadataFacade, getCompilerFacade} from '../../compiler/compiler_facade';
 import {reflectDependencies} from '../../di/jit/util';
 import {Type} from '../../interface/type';
 import {Pipe} from '../../metadata/directives';
@@ -23,7 +23,8 @@ export function compilePipe(type: Type<any>, meta: Pipe): void {
       if (ngFactoryDef === null) {
         const metadata = getPipeMetadata(type, meta);
         ngFactoryDef = getCompilerFacade().compileFactory(
-            angularCoreEnv, `ng:///${metadata.name}/ngFactory.js`, metadata, true);
+            angularCoreEnv, `ng:///${metadata.name}/ɵfac.js`,
+            {...metadata, injectFn: 'directiveInject', isPipe: true});
       }
       return ngFactoryDef;
     },
@@ -36,7 +37,7 @@ export function compilePipe(type: Type<any>, meta: Pipe): void {
       if (ngPipeDef === null) {
         const metadata = getPipeMetadata(type, meta);
         ngPipeDef = getCompilerFacade().compilePipe(
-            angularCoreEnv, `ng:///${metadata.name}/ngPipeDef.js`, metadata);
+            angularCoreEnv, `ng:///${metadata.name}/ɵpipe.js`, metadata);
       }
       return ngPipeDef;
     },
@@ -45,7 +46,7 @@ export function compilePipe(type: Type<any>, meta: Pipe): void {
   });
 }
 
-function getPipeMetadata(type: Type<any>, meta: Pipe) {
+function getPipeMetadata(type: Type<any>, meta: Pipe): R3PipeMetadataFacade {
   return {
     type: type,
     typeArgumentCount: 0,

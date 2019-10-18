@@ -147,7 +147,8 @@ export class NgtscProgram implements api.Program {
     }
 
     if (generators.length > 0) {
-      this.host = new GeneratedShimsHostWrapper(host, generators);
+      // FIXME: Remove the any cast once google3 is fully on TS3.6.
+      this.host = (new GeneratedShimsHostWrapper(host, generators) as any);
     }
 
     this.tsProgram =
@@ -401,8 +402,16 @@ export class NgtscProgram implements api.Program {
         checkQueries: false,
         checkTemplateBodies: true,
         checkTypeOfInputBindings: true,
+        strictNullInputBindings: true,
         // Even in full template type-checking mode, DOM binding checks are not quite ready yet.
         checkTypeOfDomBindings: false,
+        checkTypeOfOutputEvents: true,
+        checkTypeOfAnimationEvents: true,
+        // Checking of DOM events currently has an adverse effect on developer experience,
+        // e.g. for `<input (blur)="update($event.target.value)">` enabling this check results in:
+        // - error TS2531: Object is possibly 'null'.
+        // - error TS2339: Property 'value' does not exist on type 'EventTarget'.
+        checkTypeOfDomEvents: false,
         checkTypeOfPipes: true,
         strictSafeNavigationTypes: true,
       };
@@ -412,7 +421,11 @@ export class NgtscProgram implements api.Program {
         checkQueries: false,
         checkTemplateBodies: false,
         checkTypeOfInputBindings: false,
+        strictNullInputBindings: false,
         checkTypeOfDomBindings: false,
+        checkTypeOfOutputEvents: false,
+        checkTypeOfAnimationEvents: false,
+        checkTypeOfDomEvents: false,
         checkTypeOfPipes: false,
         strictSafeNavigationTypes: false,
       };
@@ -458,7 +471,7 @@ export class NgtscProgram implements api.Program {
         // Finally, check if the reference is being written into a file within the project's logical
         // file system, and use a relative import if so. If this fails, ReferenceEmitter will throw
         // an error.
-        new LogicalProjectStrategy(checker, new LogicalFileSystem(this.rootDirs)),
+        new LogicalProjectStrategy(this.reflector, new LogicalFileSystem(this.rootDirs)),
       ]);
     } else {
       // The CompilerHost supports fileNameToModuleName, so use that to emit imports.
@@ -468,7 +481,7 @@ export class NgtscProgram implements api.Program {
         // Then use aliased references (this is a workaround to StrictDeps checks).
         new AliasStrategy(),
         // Then use fileNameToModuleName to emit imports.
-        new FileToModuleStrategy(checker, this.fileToModuleHost),
+        new FileToModuleStrategy(this.reflector, this.fileToModuleHost),
       ]);
       aliasGenerator = new AliasGenerator(this.fileToModuleHost);
     }
@@ -509,8 +522,8 @@ export class NgtscProgram implements api.Program {
           this.reflector, evaluator, metaRegistry, this.metaReader !, scopeReader, scopeRegistry,
           this.isCore, this.resourceManager, this.rootDirs,
           this.options.preserveWhitespaces || false, this.options.i18nUseExternalIds !== false,
-          this.moduleResolver, this.cycleAnalyzer, this.refEmitter, this.defaultImportTracker,
-          this.incrementalState),
+          this.getI18nLegacyMessageFormat(), this.moduleResolver, this.cycleAnalyzer,
+          this.refEmitter, this.defaultImportTracker, this.incrementalState),
       new DirectiveDecoratorHandler(
           this.reflector, evaluator, metaRegistry, this.defaultImportTracker, this.isCore),
       new InjectableDecoratorHandler(
@@ -527,6 +540,11 @@ export class NgtscProgram implements api.Program {
     return new IvyCompilation(
         handlers, this.reflector, this.importRewriter, this.incrementalState, this.perfRecorder,
         this.sourceToFactorySymbols, scopeRegistry);
+  }
+
+  private getI18nLegacyMessageFormat(): string {
+    return this.options.enableI18nLegacyMessageIdFormat !== false && this.options.i18nInFormat ||
+        '';
   }
 
   private get reflector(): TypeScriptReflectionHost {

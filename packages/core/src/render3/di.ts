@@ -16,7 +16,7 @@ import {Type} from '../interface/type';
 import {assertDefined, assertEqual} from '../util/assert';
 
 import {getFactoryDef} from './definition';
-import {NG_ELEMENT_ID} from './fields';
+import {NG_ELEMENT_ID, NG_FACTORY_DEF} from './fields';
 import {DirectiveDef, FactoryFn} from './interfaces/definition';
 import {NO_PARENT_INJECTOR, NodeInjectorFactory, PARENT_INJECTOR, RelativeInjectorLocation, RelativeInjectorLocationFlags, TNODE, isFactory} from './interfaces/injector';
 import {AttributeMarker, TContainerNode, TElementContainerNode, TElementNode, TNode, TNodeFlags, TNodeProviderIndexes, TNodeType} from './interfaces/node';
@@ -152,21 +152,16 @@ export function getOrCreateNodeInjectorForNode(
     insertBloom(tView.data, tNode);  // foundation for node bloom
     insertBloom(hostView, null);     // foundation for cumulative bloom
     insertBloom(tView.blueprint, null);
-
-    ngDevMode && assertEqual(
-                     tNode.flags === 0 || tNode.flags === TNodeFlags.isComponentHost, true,
-                     'expected tNode.flags to not be initialized');
   }
 
   const parentLoc = getParentInjectorLocation(tNode, hostView);
-  const parentIndex = getParentInjectorIndex(parentLoc);
-  const parentLView = getParentInjectorView(parentLoc, hostView);
-
   const injectorIndex = tNode.injectorIndex;
 
   // If a parent injector can't be found, its location is set to -1.
   // In that case, we don't need to set up a cumulative bloom
   if (hasParentInjector(parentLoc)) {
+    const parentIndex = getParentInjectorIndex(parentLoc);
+    const parentLView = getParentInjectorView(parentLoc, hostView);
     const parentData = parentLView[TVIEW].data as any;
     // Creates a cumulative bloom filter that merges the parent's bloom filter
     // and its own cumulative bloom (which contains tokens for all ancestors)
@@ -260,7 +255,7 @@ export function diPublicInInjector(
  *
  * Then factory method generated is:
  * ```
- * MyComponent.ngComponentDef = defineComponent({
+ * MyComponent.ɵcmp = defineComponent({
  *   factory: () => new MyComponent(injectAttribute('title'))
  *   ...
  * })
@@ -642,9 +637,11 @@ export function ɵɵgetFactoryOf<T>(type: Type<any>): FactoryFn<T>|null {
     }) as any;
   }
 
-  // TODO(crisbeto): unify injectable factories with getFactory.
-  const def = getInjectableDef<T>(typeAny) || getInjectorDef<T>(typeAny);
-  const factory = def && def.factory || getFactoryDef<T>(typeAny);
+  let factory = getFactoryDef<T>(typeAny);
+  if (factory === null) {
+    const injectorDef = getInjectorDef<T>(typeAny);
+    factory = injectorDef && injectorDef.factory;
+  }
   return factory || null;
 }
 
@@ -653,7 +650,7 @@ export function ɵɵgetFactoryOf<T>(type: Type<any>): FactoryFn<T>|null {
  */
 export function ɵɵgetInheritedFactory<T>(type: Type<any>): (type: Type<T>) => T {
   const proto = Object.getPrototypeOf(type.prototype).constructor as Type<any>;
-  const factory = ɵɵgetFactoryOf<T>(proto);
+  const factory = (proto as any)[NG_FACTORY_DEF] || ɵɵgetFactoryOf<T>(proto);
   if (factory !== null) {
     return factory;
   } else {

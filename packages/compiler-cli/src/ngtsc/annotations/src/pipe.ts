@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {R3PipeMetadata, Statement, WrappedNodeExpr, compilePipeFromMetadata} from '@angular/compiler';
+import {Identifiers, R3PipeMetadata, Statement, WrappedNodeExpr, compilePipeFromMetadata} from '@angular/compiler';
 import * as ts from 'typescript';
 
 import {ErrorCode, FatalDiagnosticError} from '../../diagnostics';
@@ -109,13 +109,17 @@ export class PipeDecoratorHandler implements DecoratorHandler<PipeHandlerData, D
   compile(node: ClassDeclaration, analysis: PipeHandlerData): CompileResult[] {
     const meta = analysis.meta;
     const res = compilePipeFromMetadata(meta);
-    const factoryRes = compileNgFactoryDefField({...meta, isPipe: true});
+    const factoryRes = compileNgFactoryDefField({
+      ...meta,
+      injectFn: Identifiers.directiveInject,
+      isPipe: true,
+    });
     if (analysis.metadataStmt !== null) {
       factoryRes.statements.push(analysis.metadataStmt);
     }
     return [
       factoryRes, {
-        name: 'ngPipeDef',
+        name: 'ɵpipe',
         initializer: res.expression,
         statements: [],
         type: res.type,
